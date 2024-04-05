@@ -1,0 +1,22 @@
+
+conda activate MyTianjinMahjong
+python -m websockets ws://localhost:9999/
+{"type": "join", "user_id": "player1"}
+{"type": "prepare", "user_id": "player1"}
+
+conda activate MyTianjinMahjong
+python -m websockets ws://localhost:9999/
+{"type": "join", "user_id": "player2"}
+{"type": "prepare", "user_id": "player2"}
+
+conda activate MyTianjinMahjong
+python -m websockets ws://localhost:9999/
+{"type": "join", "user_id": "player3"}
+{"type": "prepare", "user_id": "player3"}
+
+conda activate MyTianjinMahjong
+python -m websockets ws://localhost:9999/
+{"type": "join", "user_id": "player4"}
+{"type": "prepare", "user_id": "player4"}
+
+{"type": "ok"}

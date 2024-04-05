@@ -1,0 +1,10 @@
+.selfFulu
+{
+    transform-origin: bottom;
+    transform: rotateX(45deg);
+}
+
+.tile
+{
+    clip-path: inset(0 0 0 0);
+}

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href="client.css">
+<title>客户端测试</title>
+<script src="modules/room.js"></script>
+<script src="modules/game.js"></script>
+<script src="modules/tools.js"></script>
+<script>
+    // 全局变量
+    const xmlns="http://www.w3.org/2000/svg";  // svg命名空间
+    const h = 750;            // svg高度
+    const w = h * 667 / 375;  // svg宽度
+    const tileWidth = h / 17.25;            // 牌宽度
+    const tileHeight = tileWidth * 35 / 31  // 牌高度
+    const tileWidthHand = tileWidth * 1.5    // 自家手牌宽度
+    const tileHeightHand = tileHeight * 1.5  // 自家手牌宽度
+    const middleFrameX = w / 2 - tileWidth * 3;                                   // 中间信息框X坐标
+    const middleFrameY = tileHeight + (h - tileHeight * 2.5- tileWidth * 6) / 2;  // 中间信息框Y坐标
+    // 用于标识游戏状态
+    let status = 0;            // 0表示游戏未开始 1表示游戏已开始 2表示游戏并非刚开始(绘制结束面板时参考)
+    let is_prepare = false;    // 是否准备
+    let allowDiscard = false;  // 是否允许打牌
+    let allowQuad = false;     // 是否允许杠牌
+    // 用于确定位置信息
+    let playerID = [];       // 所有玩家ID列表
+    let selfID = "player2";  // 自家ID
+    let selfPosition = -1;   // 自家位置
+    // 用于绘制自家手牌
+    const selfHandStartX = tileHeight + 30;     // 自家第一张牌X坐标
+    const selfHandStartY = h - tileHeightHand;  // 自家第一张牌Y坐标
+    let selfCurX = selfHandStartX;              // 自家最后一张牌右侧X坐标(用于绘制摸牌时参考)
+    let selfHand = [];                          // 自家手牌列表
+    // 用于绘制副露区 牌河 分数
+    let curPos = -1;                                  // 上一个打牌玩家的位置(实现行动玩家分数变绿时需参考)
+    let curDiscardElement = -1;                       // 上一张牌的DOM元素
+    let playerCompletedhand = [[], [], [], []];       // 所有玩家副露区
+    let playerDiscard = [0, 0, 0, 0];                 // 所有玩家牌河
+    let playerScore = [0, 0, 0, 0];                   // 所有玩家分数
+    let selfFuluAreaX = w - tileHeight * 3 - tileWidth;  // 自家副露区起始位置X坐标
+    let selfFuluAreaY = h - tileHeight * 1.5;            // 自家副露区起始位置Y坐标
+    let selfFuluCurX = selfFuluAreaX;                    // 自家副露区最后一张牌位置(用于绘制下一次副露时参考)
+    let rightFuluAreaX = w - tileHeight;              // 下家副露区起始位置X坐标
+    let rightFuluAreaY = tileWidth * 0.25;            // 下家副露区起始位置Y坐标
+    let rightCurY = rightFuluAreaY;                   // 下家副露区最后一张牌位置(用于绘制下一次副露时参考)
+    let oppositeFuluAreaX = w / 2 - tileWidth * 8.5;  // 对家副露区起始位置X坐标
+    let oppositeFuluAreaY = 0;                        // 对家副露区起始位置Y坐标
+    let oppositeCurX = oppositeFuluAreaX;             // 对家副露区最后一张牌位置(用于绘制下一次副露时参考)
+    let leftFuluAreaX = 0;                            // 上家副露区起始位置X坐标
+    let leftFuluAreaY = h - tileWidth * 1.25;         // 上家副露区起始位置Y坐标
+    let leftCurY = leftFuluAreaY;                     // 上家副露区最后一张牌位置(用于绘制下一次副露时参考)
+    // 用于绘制玩家选项区
+    let optionAreaStartX = w - tileHeight - 100 - tileWidthHand * 2;
+    let optionAreaStartY = h - tileHeightHand * 2 - 20;
+    const actionNameList = ["和牌", "暗杠", "明杠", "碰", "跳过"];
+    let quadOption = []
+    let isFromPon = false;
+    
+
+    // 连接服务器
+    const socket = new WebSocket("ws://localhost:9999");
+
+    // 发送id并接受服务器返回
+    socket.onopen = function(event) {
+        let query = {"type": "join", "user_id": selfID};
+        socket.send(JSON.stringify(query));
+        draw_room();
+    }
+    
+    // 接到服务器响应后的操作
+    socket.onmessage = function(event) {
+        let received = JSON.parse(event.data);
+        console.log(received);
+        if (received.type == "room_update") {
+            // 更新房间
+            room_update(received);
+        }
+        else if (received.type == "start") {
+            // 开始游戏
+            let query = {"type": "ok"};
+            socket.send(JSON.stringify(query));
+            status = 1
+            
+            // 绘制游戏界面
+            tmp = document.querySelector("body");
+            tmp.removeChild(tmp.childNodes[1]);
+            draw_svg();
+        }
+        else if (received.type == "sit_info") {
+            // 获取座次信息
+            playerID = received.sit;
+            selfPosition = playerID.indexOf(selfID);
+            draw_player_info();
+            let query = {"type": "allow_new_round"};
+            socket.send(JSON.stringify(query));
+        }
+        else if (received.type == "init_hand") {
+            draw_init_hand(received.hand, received.dealer_pos, received.match_no, received.wild_card);
+            curPos = received.dealer_pos;
+            selfHand = received.hand;
+        }
+        else if (received.type == "new_turn") {
+            draw_new_turn(received.player);
+            curPos = received.player;
+        }
+        else if (received.type == "draw") {
+            selfHand.push(received.draw);
+            let svg =  document.querySelector("svg");
+            tmp = document.createElementNS(xmlns, "image");
+            tmp.setAttribute("href", `assets/${received.draw}.jpg`);
+            tmp.setAttributeNS(null, "x", selfCurX + tileWidth / 2);
+            tmp.setAttributeNS(null, "y", selfHandStartY);
+            tmp.setAttributeNS(null, "width", tileWidthHand);
+            tmp.setAttributeNS(null, "height", tileHeightHand);
+            tmp.setAttributeNS(null, "onclick", `selected_tile("${received.draw}")`);
+            tmp.setAttributeNS(null, "id", "draw");
+            svg.appendChild(tmp);
+        }
+        else if (received.type == "act") {
+            draw_option_area(received, false);
+        }
+        else if (received.type == "discard") {
+            let svg =  document.querySelector("svg");
+            let tmprow = playerDiscard[received.player] / 6 < 3 ? Math.floor(playerDiscard[received.player] / 6): 2;
+            let tmpcol = playerDiscard[received.player] / 6 < 3 ? playerDiscard[received.player] % 6: playerDiscard[received.player] - 12;
+            let tmppos = (received.player + 4 - selfPosition) % 4;
+            tmp = document.createElementNS(xmlns, "image");
+            tmp.setAttribute("href", `assets/${received.tile}.jpg`);
+            if (tmppos == 0) {
+                tmp.setAttributeNS(null, "x", middleFrameX + tmpcol * tileWidth);
+                tmp.setAttributeNS(null, "y", middleFrameY + tmprow * tileHeight + 6 * tileWidth);
+            } else if (tmppos == 1) {
+                tmp.setAttributeNS(null, "x", middleFrameX + (tmprow + 0.5) * tileHeight + 5.5 * tileWidth);
+                tmp.setAttributeNS(null, "y", middleFrameY + (5.5 - tmpcol) * tileWidth - tileHeight / 2);
+                tmp.setAttributeNS(null, "transform", `rotate(-90,${middleFrameX + (tmprow + 0.5) * tileHeight + 6 * tileWidth}, ${middleFrameY + (5.5 - tmpcol) * tileWidth})`);
+            } else if (tmppos == 2) {
+                tmp.setAttributeNS(null, "x", middleFrameX + (5 - tmpcol) * tileWidth);
+                tmp.setAttributeNS(null, "y", middleFrameY - (1 + tmprow) * tileHeight);
+                tmp.setAttributeNS(null, "transform", `rotate(180,${middleFrameX + (5.5 - tmpcol) * tileWidth}, ${middleFrameY - (0.5 + tmprow) * tileHeight})`);
+            } else if (tmppos == 3) {
+                tmp.setAttributeNS(null, "x", middleFrameX - (tmprow + 0.5) * tileHeight - tileWidth / 2);
+                tmp.setAttributeNS(null, "y", middleFrameY + (tmpcol + 0.5) * tileWidth - tileHeight / 2);
+                tmp.setAttributeNS(null, "transform", `rotate(90,${middleFrameX - (tmprow + 0.5) * tileHeight}, ${middleFrameY + (tmpcol + 0.5) * tileWidth})`);
+            }
+            tmp.setAttributeNS(null, "width", tileWidth);
+            tmp.setAttributeNS(null, "height", tileHeight);
+            tmp.setAttributeNS(null, "class", "discard");
+            svg.appendChild(tmp);
+            curDiscardElement = tmp;
+            playerDiscard[received.player] += 1;
+        }
+        else if (received.type == "pon") {
+            draw_pon(received);
+        }
+        else if (received.type == "concealed_quad") {
+            draw_concealed_quad(received);
+        }
+        else if (received.type == "exposed_quad") {
+            draw_exposed_quad(received);
+        }
+        else if (received.type == "win") {
+            draw_win(received);
+            // 更新分数
+            for (let i = 0; i < 4; i++) {
+                playerScore[i] += received.round_pts[i];
+            }
+
+            setTimeout(() => {
+                reset_all_variable(true);
+                let query = {"type": "allow_new_round"};
+                socket.send(JSON.stringify(query));
+            }, 3000);
+        }
+        else if (received.type == "exhaustive_draw") {
+            draw_exhaustive_draw(received);
+            // 更新分数
+            for (let i = 0; i < 4; i++) {
+                playerScore[i] += received.round_pts[i];
+            }
+            setTimeout(() => {
+                reset_all_variable(false);
+                let query = {"type": "allow_new_round"};
+                socket.send(JSON.stringify(query));
+            }, 3000);
+        }
+    }
+
+    // 发送消息
+    function send_message(selected_action, option) {
+        // if(status == 0) {
+        //     let query = {"type": "", "user_id": selfID};
+        //     query.type = document.getElementById("user_input").value;
+        //     socket.send(JSON.stringify(query));
+        // }
+        // else {
+        //     let query = {"selected_action": "", "option": ""};
+        //     tmp = document.getElementById("user_input").value.split(" ");
+        //     query.selected_action = tmp[0];
+        //     query.option = tmp[1];
+        //     socket.send(JSON.stringify(query));
+        // }
+        let query = {"selected_action": selected_action, "option": option};
+        socket.send(JSON.stringify(query));
+    }
+
+    // 准备
+    function prepare() {
+        let query = {"type": "", "user_id": selfID};
+        if (is_prepare) {
+            query.type = "unprepare";
+            is_prepare = false;
+            document.querySelector("button").textContent = "准备";
+        }
+        else {
+            query.type = "prepare";
+            is_prepare = true;
+            document.querySelector("button").textContent = "取消准备";
+        }
+        socket.send(JSON.stringify(query));
+    }
+
+    // 选中某张手牌
+    function selected_tile(option) {
+        if (allowDiscard) {
+            // 若当前允许打牌 则打出该牌
+            discard(option);
+            clear_option_area();
+        } else if (allowQuad && quadOption.includes(option)) {
+            allowDiscard = false;
+            let query = "";
+            if (playerCompletedhand[selfPosition].includes(option + option + option)) {
+                 query = {"selected_action": "3", "option": option};
+            }
+            else {
+                query = {"selected_action": "2", "option": option};
+            }
+            socket.send(JSON.stringify(query));
+            clear_option_area();
+        }
+    }
+
+    // 打牌
+    function discard(option) {
+        // 把被打的牌摘出去并对手牌重新排序
+        let tmpidx = selfHand.indexOf(option);
+        selfHand.splice(tmpidx, 1);
+        sort_tiles(selfHand, 0, selfHand.length - 1);
+
+        // 绘制玩家手牌
+        let svg =  document.querySelector("svg");
+        // 把打出的牌添加到牌河
+        if (!isFromPon){
+            document.getElementById("draw").remove();
+        }
+        // 清除之前的手牌
+        tmp = document.querySelectorAll(".selfHand");
+        for (let i = 0; i < tmp.length; i++) {
+            tmp[i].remove();
+        }
+        // 绘制更新后的手牌
+        selfCurX = selfHandStartX;
+        for (let i = 0; i < selfHand.length; i++) {
+            tmp = document.createElementNS(xmlns, "image");
+            tmp.setAttribute("href", `assets/${selfHand[i]}.jpg`);
+            tmp.setAttributeNS(null, "x", selfCurX);
+            tmp.setAttributeNS(null, "y", selfHandStartY);
+            tmp.setAttributeNS(null, "width", tileWidthHand);
+            tmp.setAttributeNS(null, "height", tileHeightHand);
+            tmp.setAttributeNS(null, "onclick", `selected_tile("${selfHand[i]}")`);
+            tmp.setAttributeNS(null, "class", "selfHand");
+            svg.appendChild(tmp);
+            selfCurX += tileWidthHand;
+        }
+
+        isFromPon = false;
+        allowDiscard = false;
+
+        // 发送打牌消息
+        let query = {"selected_action": "0", "option": option};
+        socket.send(JSON.stringify(query));
+    }
+
+    // 和牌
+    function win() {
+        let query = {"selected_action": "1", "option": ""};
+        socket.send(JSON.stringify(query));
+        clear_option_area();
+    }
+
+    // 暗杠
+    function concealed_quad(received) {
+        if (received.concealed_quad_option.length == 1) {
+            // 只有一种暗杠方法 则直接发送消息
+            allowDiscard = false;
+            let query = {"selected_action": "2", "option": received.concealed_quad_option[0]};
+            socket.send(JSON.stringify(query));
+            clear_option_area();
+        }
+        else {
+            // 若有多种暗杠方法 则让用户选择暗杠的牌
+            allowDiscard = false;
+            allowQuad = true;
+            quadOption = received.concealed_quad_option;
+            draw_return_option(received);
+        }
+    }
+
+    // 明杠
+    function exposed_quad(received) {
+        if (received.exposed_quad_option.length == 1) {
+            // 只有一种明杠方法 则直接发送消息
+            allowDiscard = false;
+            let query = {"selected_action": "3", "option": received.exposed_quad_option[0]};
+            socket.send(JSON.stringify(query));
+            clear_option_area();
+        }
+        else {
+            // 若有多种明杠方法 则让用户选择明杠的牌
+            allowDiscard = false;
+            allowQuad = true;
+            quadOption = received.exposed_quad_option;
+            draw_return_option(received);
+        }
+    }
+
+    // 碰
+    function pon(received) {
+        let query = {"selected_action": "4", "option": received.pon_option[0]};
+        socket.send(JSON.stringify(query));
+        clear_option_area();
+        isFromPon = true;
+    }
+
+    function pass() {
+        let query = {"selected_action": "5", "option": ""};
+        socket.send(JSON.stringify(query));
+        clear_option_area();
+    }
+</script>
+</head>
+<body>
+<div id="container">
+</div>
+</body>
+</html>
