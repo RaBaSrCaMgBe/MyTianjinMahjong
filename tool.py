@@ -1,3 +1,5 @@
+from typing import List
+
 # 比较牌值
 # 若tile1大于tile2返回True
 def compare_tiles(tile1, tile2):
@@ -117,8 +119,11 @@ def is_dragon(completed_hand, global_wild_tile):
 
 # 判断是否捉五
 def is_catching_five(completed_hand, draw, global_wild_tile):
+    # 返回值包含一个列表(用于表示所有形成双混儿五的面子)以及捉五类型
     if draw != '5m' and not is_wild_tile(draw, global_wild_tile):
-        return False
+        return 0, ''
+    double_wild_tanki_catching_five_comb = []
+    catching_five_type_with_max_score = 0
     for meld in completed_hand:
         if 'z' in meld:
             continue
@@ -127,18 +132,36 @@ def is_catching_five(completed_hand, draw, global_wild_tile):
         cnt = meld.count('0')
         if cnt == 0 and meld[:2] == '4m' and draw == '5m':
             # 46m摸5m的情况
-            return True
+            catching_five_type_with_max_score = 1
         elif cnt == 1:
             if meld[:4] == '4m6m' and is_wild_tile(draw, global_wild_tile):
                 # 46m摸混儿的情况
-                return True
+                catching_five_type_with_max_score = 1
             if meld[:4] in ['4m5m', '5m6m'] and draw == '5m':
                 # 4m+混儿 混儿+6m 摸5m的情况
-                return True
+                catching_five_type_with_max_score = 1
         elif cnt == 2 and meld[:2] in ['4m', '5m', '6m']:
-            # 4m+混儿 混儿+6m 摸混儿
-            # 双混儿摸5m
-            return True
+            if draw == '5m':
+                # 双混儿摸5m 此时为双混儿五
+                double_wild_tanki_catching_five_comb.append(meld)
+                catching_five_type_with_max_score = 2
+            else:
+                # 4m+混儿 混儿+6m 摸混儿
+                catching_five_type_with_max_score = 1
         elif cnt == 3:
-            return True
+            # 双混儿摸混儿
+            double_wild_tanki_catching_five_comb.append(meld)
+            catching_five_type_with_max_score = 2
 
+    return double_wild_tanki_catching_five_comb, catching_five_type_with_max_score
+
+# 判断是否为双混儿捉五龙
+def is_double_wild_tanki_catching_five_dragon(double_wild_tanki_catching_five_comb, completed_hand : List[str],
+                                              global_wild_tile):
+    for meld in double_wild_tanki_catching_five_comb:
+        tmp_completed_hand = completed_hand.copy()
+        tmp_completed_hand.remove(meld)
+        if is_dragon(tmp_completed_hand, global_wild_tile):
+            # 去掉摸牌的搭子依然是龙 此时一定为双混儿捉五龙
+            return True
+    return False

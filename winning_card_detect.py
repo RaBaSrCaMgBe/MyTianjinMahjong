@@ -1,5 +1,5 @@
 import copy
-from tool import is_wild_tile, is_catching_five, is_dragon
+from tool import is_wild_tile, is_catching_five, is_dragon, is_double_wild_tanki_catching_five_dragon
 
 def check_hand(hand, completed_hand, draw, global_wild_tile, is_rinshan):
     # 判断玩家手牌是否满足和牌型
@@ -131,9 +131,9 @@ def check_hand(hand, completed_hand, draw, global_wild_tile, is_rinshan):
                 completed_hand.pop()
                 num_wild_card += tmp_stack_item[1]
 
-    # print(score)
-    # print(pattern)
-    # print(best_hand)
+    print(score)
+    print(pattern)
+    print(best_hand)
     return score, pattern
 
 def find_meld(normal_hand, is_selected_tile, tile_idx, mode, layer):
@@ -157,7 +157,7 @@ def find_meld(normal_hand, is_selected_tile, tile_idx, mode, layer):
                 or int(normal_hand[second_diff_tile_idx][0]) != int(normal_hand[tile_idx][0]) + 2:
             return [[], 0, 0]
         return [[tile_idx, first_diff_tile_idx, second_diff_tile_idx], 0, layer]
-    if mode == 'chow_1w_f':
+    elif mode == 'chow_1w_f':
         # 包含一张混儿的顺子 混儿当第三张牌
         first_diff_tile_idx = tile_idx + 1
         while first_diff_tile_idx < len_normal_hand \
@@ -169,7 +169,7 @@ def find_meld(normal_hand, is_selected_tile, tile_idx, mode, layer):
                 and int(normal_hand[first_diff_tile_idx][0]) != int(normal_hand[tile_idx][0]) + 2):
             return [[], 0, 0]
         return [[tile_idx, first_diff_tile_idx], 1, layer]
-    if mode == 'chow_1w_s':
+    elif mode == 'chow_1w_s':
         # 包含一张混儿的顺子 混儿当第二张牌
         first_diff_tile_idx = tile_idx + 1
         while first_diff_tile_idx < len_normal_hand \
@@ -188,7 +188,7 @@ def find_meld(normal_hand, is_selected_tile, tile_idx, mode, layer):
                 or int(normal_hand[second_diff_tile_idx][0]) != int(normal_hand[tile_idx][0]) + 2:
             return [[], 0, 0]
         return [[tile_idx, second_diff_tile_idx], 1, layer]
-    if mode == 'pong_0w':
+    elif mode == 'pong_0w':
         # 不包含混儿的刻子
         first_diff_tile_idx = tile_idx + 1
         while first_diff_tile_idx < len_normal_hand and is_selected_tile[first_diff_tile_idx]:
@@ -203,7 +203,7 @@ def find_meld(normal_hand, is_selected_tile, tile_idx, mode, layer):
                 or normal_hand[second_diff_tile_idx] != normal_hand[tile_idx]:
             return [[], 0, 0]
         return [[tile_idx, first_diff_tile_idx, second_diff_tile_idx], 0, layer]
-    if mode == 'pong_1w':
+    elif mode == 'pong_1w':
         # 包含一张混儿的刻子
         first_diff_tile_idx = tile_idx + 1
         while first_diff_tile_idx < len_normal_hand and is_selected_tile[first_diff_tile_idx]:
@@ -240,7 +240,7 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
     # 龙
     if dragon_type := is_dragon(completed_hand, global_wild_tile):
         pattern.append('龙')
-        base_score = 5
+        base_score = 4
         if dragon_type == 2:
             pattern.append('本混儿')
             doubles *= 2
@@ -251,24 +251,54 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
             pattern.append('混儿钓')
             doubles *= 2
             has_wild_tanki = True
-        if is_wild_tile(draw, global_wild_tile) and completed_hand[0] == '0a0a':
+        elif is_wild_tile(draw, global_wild_tile) and completed_hand[0] == '0a0a':
             pattern.append('混儿钓')
             doubles *= 2
             has_wild_tanki = True
+    # 双混儿钓 摸上来的牌和两个混儿组成搭子
+    has_double_wild_tanki = False
+    if not is_wild_tile(draw, global_wild_tile) and draw + '0a0a' in completed_hand:
+        has_double_wild_tanki = True
+    elif is_wild_tile(draw, global_wild_tile) and '0a0a0a' in completed_hand:
+        has_double_wild_tanki = True
+
     # 捉五 注意混儿钓和捉五不能共存 若没有龙则选捉五 其余情况选混儿钓
-    if is_catching_five(completed_hand, draw, global_wild_tile):
-        if has_wild_tanki:
+    double_wild_tanki_catching_five_comb, catching_five_type_with_max_score = is_catching_five(completed_hand, draw,
+                                                                                               global_wild_tile)
+    if catching_five_type_with_max_score:
+        if has_wild_tanki or has_double_wild_tanki:
             if dragon_type == 0:
-                pattern.pop()
-                pattern.append('捉五')
-                base_score = 3
-                doubles = doubles // 2
-        else:
+                # 当前满足混儿钓 而无法形成龙 此时不计混儿钓 计捉五/双混儿五
+                if has_wild_tanki:
+                    pattern.pop()
+                    doubles = doubles // 2
+                if catching_five_type_with_max_score == 1:
+                    # 此时一定没龙 只能定捉五
+                    pattern.append('捉五')
+                    base_score = 3
+                else:
+                    pattern.append('双混儿五')
+                    base_score = 6
+            elif catching_five_type_with_max_score == 2:
+                # 当前满足混儿钓龙 检查是否存在双混儿捉五龙
+                if is_double_wild_tanki_catching_five_dragon(double_wild_tanki_catching_five_comb, completed_hand,
+                                                             global_wild_tile):
+                    pattern.append('双混儿五')
+                    base_score = 7
+                    doubles = doubles * 2
+        elif dragon_type:
+            # 捉五龙
             pattern.append('捉五')
-            if dragon_type == 0:
-                base_score = 3
-            else:
-                base_score = 8
+            base_score = 7
+        elif catching_five_type_with_max_score == 2:
+            # 双混儿五
+            pattern.append('双混儿五')
+            base_score = 6
+        else:
+            # 捉五
+            pattern.append('捉五')
+            base_score = 3
+
     # print(completed_hand)
     # print(pattern)
     # print(base_score * doubles)
@@ -278,9 +308,13 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
     return base_score * doubles, pattern
 
 if __name__ == '__main__':
-    hand = ['1m', '1m', '2p', '1p', '1p', '1p', '3p', '4p', '5p', '6p', '6s', '7s', '8s', '1p']
+    # 手牌 = 1万1万 2-8饼 678条
+    # hand = ['1p', '1p', '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '1z', '1z', '4m'] # 双混儿捉五本
+    # hand = ['4s', '4s', '1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '1z', '1z', '1z'] # 捉五本混儿龙
+    # hand = ['1m', '1m', '1m', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '1z', '1z', '5m'] # 双混儿捉五龙
+    hand = ['4s', '4s', '1p', '1p', '1p', '4m', '4m', '5m', '7m', '8m', '9m', '1z', '1z', '1z']
     completed_hand = []
-    draw = '1p'
-    global_wild_tile = '9p'
+    draw = '5m'
+    global_wild_tile = '4s'
     is_rinshan = False
     check_hand(hand, completed_hand, draw, global_wild_tile, is_rinshan)
