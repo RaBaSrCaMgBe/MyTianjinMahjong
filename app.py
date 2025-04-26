@@ -155,6 +155,7 @@ async def handle_room_server(websocket):
                     break
         except ConnectionClosedOK:
             reset()
+            break
 
 
 async def main():
