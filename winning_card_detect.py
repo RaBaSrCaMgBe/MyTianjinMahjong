@@ -220,7 +220,7 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
     # print(global_wild_tile)
     # print(is_rinshan)
     pattern = []
-    base_score = 0
+    base_score = 1
     doubles = 1
     # 先补全手牌
     new_melds = 5 - len(completed_hand)
@@ -231,12 +231,10 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
     if num_wild_card_total == 0:
         pattern.append('清')
         doubles *= 2
-        base_score = 1
     # 杠开
     if is_rinshan:
         pattern.append('杠开')
         doubles *= 2
-        base_score = 1
     # 龙
     if dragon_type := is_dragon(completed_hand, global_wild_tile):
         pattern.append('龙')
@@ -246,15 +244,14 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
             doubles *= 2
     # 混儿钓 1.雀头中包含混儿 2.a抓到的牌非混儿 雀头中包含抓到的牌 2.b抓到的牌为混儿 雀头为两个混儿
     has_wild_tanki = False
-    if '0a' in completed_hand[0]:
-        if not is_wild_tile(draw, global_wild_tile) and draw in completed_hand[0]:
-            pattern.append('混儿钓')
-            doubles *= 2
-            has_wild_tanki = True
-        elif is_wild_tile(draw, global_wild_tile) and completed_hand[0] == '0a0a':
-            pattern.append('混儿钓')
-            doubles *= 2
-            has_wild_tanki = True
+    if not is_wild_tile(draw, global_wild_tile) and draw + '0a' in completed_hand:
+        pattern.append('混儿钓')
+        doubles *= 2
+        has_wild_tanki = True
+    elif is_wild_tile(draw, global_wild_tile) and '0a0a' in completed_hand:
+        pattern.append('混儿钓')
+        doubles *= 2
+        has_wild_tanki = True
     # 双混儿钓 摸上来的牌和两个混儿组成搭子
     has_double_wild_tanki = False
     if not is_wild_tile(draw, global_wild_tile) and draw + '0a0a' in completed_hand:
@@ -285,7 +282,7 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
                                                              global_wild_tile):
                     pattern.append('双混儿五')
                     base_score = 7
-                    doubles = doubles * 2
+                    doubles *= 2
         elif dragon_type:
             # 捉五龙
             pattern.append('捉五')
@@ -312,9 +309,10 @@ if __name__ == '__main__':
     # hand = ['1p', '1p', '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '1z', '1z', '4m'] # 双混儿捉五本
     # hand = ['4s', '4s', '1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '1z', '1z', '1z'] # 捉五本混儿龙
     # hand = ['1m', '1m', '1m', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '1z', '1z', '5m'] # 双混儿捉五龙
-    hand = ['4s', '4s', '1p', '1p', '1p', '4m', '4m', '5m', '7m', '8m', '9m', '1z', '1z', '1z']
-    completed_hand = []
-    draw = '5m'
-    global_wild_tile = '4s'
+    # hand = ['4s', '4s', '1p', '1p', '1p', '4m', '4m', '5m', '7m', '8m', '9m', '1z', '1z', '1z']
+    completed_hand = ['9p9p9p']
+    hand = ['4m', '7m', '8m', '9m', '1p', '2p', '3p', '6s', '7s', '8s', '4s']
+    draw = '4s'
+    global_wild_tile = '3m'
     is_rinshan = False
     check_hand(hand, completed_hand, draw, global_wild_tile, is_rinshan)

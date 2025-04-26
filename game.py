@@ -68,7 +68,7 @@ class Game:
         hand = ori_hand[:]
         sort_tiles(hand, 0, len(hand) - 1)
         score, pattern = check_hand(hand, completed_hand, draw, self.wild_card, is_rinshan)
-        if score:
+        if pattern:
             actions.append(1)
         # 检测是否可以暗/明杠
         concealed_quad_option = []
