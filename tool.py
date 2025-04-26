@@ -65,9 +65,11 @@ def is_dragon(completed_hand, global_wild_tile):
     s_dragon = [0, 0, 0]
     wild_dragon = 0
     for meld in completed_hand:
+        if len(meld) == 4:
+            continue
         if 'z' in meld:
             continue
-        if meld[0] == meld[2] and meld[0][0] != '0':
+        if meld[0] == meld[2] and meld[0] != '0':
             continue
         cnt = meld.count('0')
         if cnt == 0:
@@ -81,7 +83,8 @@ def is_dragon(completed_hand, global_wild_tile):
                     s_dragon[(tmp-1)//3] = 1
         elif cnt == 1:
             tmp = int(meld[0])
-            if tmp in [1, 2, 4, 5, 7, 8]:
+            tmp_next = int(meld[2])
+            if tmp in [1, 4, 7] or (tmp in [2, 5, 8] and tmp_next - tmp == 1):
                 if meld[1] == 'm':
                     m_dragon[tmp//3] = 1
                 elif meld[1] == 'p':

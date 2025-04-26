@@ -306,13 +306,13 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
 
 if __name__ == '__main__':
     # 手牌 = 1万1万 2-8饼 678条
-    # hand = ['1p', '1p', '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '1z', '1z', '4m'] # 双混儿捉五本
-    # hand = ['4s', '4s', '1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '1z', '1z', '1z'] # 捉五本混儿龙
+    # hand = ['1p', '1p', '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '1z', '1z', '5m'] # 双混儿捉五本
+    hand = ['4s', '4s', '1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '1z', '1z', '1z'] # 捉五本混儿龙
     # hand = ['1m', '1m', '1m', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '1z', '1z', '5m'] # 双混儿捉五龙
     # hand = ['4s', '4s', '1p', '1p', '1p', '4m', '4m', '5m', '7m', '8m', '9m', '1z', '1z', '1z']
-    completed_hand = ['9p9p9p']
-    hand = ['4m', '7m', '8m', '9m', '1p', '2p', '3p', '6s', '7s', '8s', '4s']
-    draw = '4s'
-    global_wild_tile = '3m'
+    completed_hand = []
+    # hand = ['4m', '5m', '6m', '3p', '4p', '5p', '2s', '4s', '4s', '5s', '6s', '7s', '8s', '9s']
+    draw = '5m'
+    global_wild_tile = '1m'
     is_rinshan = False
     check_hand(hand, completed_hand, draw, global_wild_tile, is_rinshan)
