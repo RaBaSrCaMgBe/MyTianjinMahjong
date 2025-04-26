@@ -5,7 +5,7 @@ import http
 import os
 import signal
 
-from websockets import serve
+from websockets import serve, ConnectionClosedOK
 
 from room import Room
 from game import Game
@@ -107,51 +107,54 @@ async def handle_room_server(websocket):
 
     # 开始游戏
     while True:
-        # 开始新一轮游戏并初始化信号量
-        received = await websocket.recv()
-        await room.room_lock.acquire()
-        if game.status == 0:
-            game.init_a_new_round()
-            game.status = 1
-            game.player_lock[game.dealer_pos].release()
-            room.room_barrier = asyncio.Barrier(4)
-        if game.status == 1:
-            response = {
-                'type': 'init_hand',
-                'hand': [],
-                'wild_card': game.wild_card,
-                'dealer_pos': game.dealer_pos,
-                'match_no': game.match_no
-            }
-            for tile in game.player_list[cur_position].hand:
-                response['hand'].append(tile)
-            response = json.dumps(response)
-            await websocket.send(response)
-        elif game.status == 2:
-            break
-        room.room_lock.release()
-        await room.room_barrier.wait()
-        # 开始一轮游戏
-        while True:
-            # 拿锁
-            await game.player_lock[cur_position].acquire()
+        try:
+            # 开始新一轮游戏并初始化信号量
+            received = await websocket.recv()
+            await room.room_lock.acquire()
+            if game.status == 0:
+                game.init_a_new_round()
+                game.status = 1
+                game.player_lock[game.dealer_pos].release()
+                room.room_barrier = asyncio.Barrier(4)
             if game.status == 1:
-                # 若游戏还在进行 则表示该玩家进入回合 开始操作
-                await game.step(websocket, room.client_list)
-                # 归还锁
-                if game.status == 1:
-                    # 若游戏还在进行 则解开下回合行动玩家的锁
-                    game.player_lock[game.turn].release()
-                else:
-                    # 否则归还所有人的锁 以便进入下一轮
-                    for i in range(4):
-                        if i == cur_position:
-                            continue
-                        game.player_lock[i].release()
-                    break
-            else:
-                # 本轮游戏结束 退出循环
+                response = {
+                    'type': 'init_hand',
+                    'hand': [],
+                    'wild_card': game.wild_card,
+                    'dealer_pos': game.dealer_pos,
+                    'match_no': game.match_no
+                }
+                for tile in game.player_list[cur_position].hand:
+                    response['hand'].append(tile)
+                response = json.dumps(response)
+                await websocket.send(response)
+            elif game.status == 2:
                 break
+            room.room_lock.release()
+            await room.room_barrier.wait()
+            # 开始一轮游戏
+            while True:
+                # 拿锁
+                await game.player_lock[cur_position].acquire()
+                if game.status == 1:
+                    # 若游戏还在进行 则表示该玩家进入回合 开始操作
+                    await game.step(websocket, room.client_list)
+                    # 归还锁
+                    if game.status == 1:
+                        # 若游戏还在进行 则解开下回合行动玩家的锁
+                        game.player_lock[game.turn].release()
+                    else:
+                        # 否则归还所有人的锁 以便进入下一轮
+                        for i in range(4):
+                            if i == cur_position:
+                                continue
+                            game.player_lock[i].release()
+                        break
+                else:
+                    # 本轮游戏结束 退出循环
+                    break
+        except ConnectionClosedOK:
+            reset()
 
 
 async def main():
