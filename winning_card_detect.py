@@ -283,6 +283,11 @@ def check_pattern(completed_hand, num_wild_card_total, draw, global_wild_tile, i
                     pattern.append('双混儿五')
                     base_score = 7
                     doubles *= 2
+                elif dragon_type != 2:
+                    pattern.append('双混儿五')
+                    base_score = 3
+                    doubles *= 2
+                    pattern.remove('龙')
         elif dragon_type:
             # 捉五龙
             pattern.append('捉五')
